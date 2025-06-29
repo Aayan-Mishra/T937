@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Track } from "@/lib/types";
@@ -15,6 +16,7 @@ interface VinylPlayerProps {
   onPrev: () => void;
   volume: number;
   onVolumeChange: (volume: number[]) => void;
+  fallbackUI?: React.ReactNode;
 }
 
 export function VinylPlayer({
@@ -24,7 +26,8 @@ export function VinylPlayer({
   onNext,
   onPrev,
   volume,
-  onVolumeChange
+  onVolumeChange,
+  fallbackUI
 }: VinylPlayerProps) {
   
   const VolumeIcon = () => {
@@ -60,22 +63,24 @@ export function VinylPlayer({
       </div>
 
       <Card className="w-full max-w-md mt-8 bg-transparent border-none shadow-none">
-        <CardHeader className="text-center">
+        <CardHeader className="text-center min-h-[90px]">
           <CardTitle className="text-3xl font-headline text-primary">{track?.title || "Select a song"}</CardTitle>
           <CardDescription className="text-lg text-muted-foreground">{track?.artist || "to start playing"}</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col items-center gap-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={onPrev} disabled={!track} aria-label="Previous track">
-              <SkipBack className="w-8 h-8 text-accent" />
-            </Button>
-            <Button variant="ghost" size="icon" className="w-16 h-16" onClick={onPlayPause} disabled={!track} aria-label={isPlaying ? 'Pause' : 'Play'}>
-              {isPlaying ? <Pause className="w-12 h-12 text-primary fill-primary" /> : <Play className="w-12 h-12 text-primary fill-primary" />}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={onNext} disabled={!track} aria-label="Next track">
-              <SkipForward className="w-8 h-8 text-accent" />
-            </Button>
-          </div>
+        <CardContent className="flex flex-col items-center gap-4 min-h-[80px]">
+          {fallbackUI || (
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={onPrev} disabled={!track} aria-label="Previous track">
+                <SkipBack className="w-8 h-8 text-accent" />
+              </Button>
+              <Button variant="ghost" size="icon" className="w-16 h-16" onClick={onPlayPause} disabled={!track} aria-label={isPlaying ? 'Pause' : 'Play'}>
+                {isPlaying ? <Pause className="w-12 h-12 text-primary fill-primary" /> : <Play className="w-12 h-12 text-primary fill-primary" />}
+              </Button>
+              <Button variant="ghost" size="icon" onClick={onNext} disabled={!track} aria-label="Next track">
+                <SkipForward className="w-8 h-8 text-accent" />
+              </Button>
+            </div>
+          )}
         </CardContent>
         <CardFooter className="flex items-center gap-4 justify-center">
           <VolumeIcon />

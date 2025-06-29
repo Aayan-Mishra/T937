@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from 'next/navigation';
 import type { User } from 'firebase/auth';
 import { signOut } from 'firebase/auth';
@@ -9,16 +10,10 @@ import type { Playlist, Track } from "@/lib/types";
 import { PlaylistView } from "@/components/playlist-view";
 import { VinylPlayer } from "@/components/vinyl-player";
 import { Button } from "@/components/ui/button";
-import { Github, LogOut, Music } from "lucide-react";
+import { Github, LogOut, Music, Youtube } from "lucide-react";
 import { useSpotifyPlayer } from "@/hooks/use-spotify-player";
 import { useToast } from "@/hooks/use-toast";
-
-function formatDuration(ms: number): string {
-  if (isNaN(ms)) return '0:00';
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Number(((ms % 60000) / 1000).toFixed(0));
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
+import YouTube from 'react-youtube';
 
 const MusicPet = ({ isPlaying }: { isPlaying: boolean }) => {
   return (
@@ -56,6 +51,13 @@ const MusicPet = ({ isPlaying }: { isPlaying: boolean }) => {
   );
 };
 
+function formatDuration(ms: number): string {
+  if (isNaN(ms)) return '0:00';
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Number(((ms % 60000) / 1000).toFixed(0));
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConnected, accessToken }: { user: User, isSpotifyConnected: boolean, accessToken: string | null }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -63,11 +65,18 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(true);
+  
+  const [playbackSource, setPlaybackSource] = useState<'spotify' | 'youtube'>('spotify');
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(50);
+
+  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
+  const youtubePlayerRef = useRef<any>(null);
   
   const { 
-    play, 
-    togglePlay, 
+    play: spotifyPlay, 
+    togglePlay: spotifyTogglePlay, 
     nextTrack: sdkNextTrack,
     previousTrack: sdkPrevTrack,
     setVolume: sdkSetVolume,
@@ -76,34 +85,43 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
     error: sdkError
   } = useSpotifyPlayer(accessToken);
 
+  const isPremiumRequiredError = sdkError?.type === 'account';
+
   useEffect(() => {
-    if (sdkError) {
+    if (sdkError && sdkError.type !== 'account') {
       toast({
         variant: "destructive",
         title: "Playback Error",
-        description: sdkError,
+        description: sdkError.message,
       });
     }
   }, [sdkError, toast]);
+  
+  useEffect(() => {
+    if (playbackSource === 'spotify') {
+      setIsPlaying(sdkIsPlaying);
+    }
+  }, [sdkIsPlaying, playbackSource]);
 
-  const displayTrack = useMemo<Track | null>(() => {
-    if (!sdkCurrentTrack) return null;
-    return {
-      id: sdkCurrentTrack.id!,
-      uri: sdkCurrentTrack.uri,
-      title: sdkCurrentTrack.name,
-      artist: sdkCurrentTrack.artists.map(a => a.name).join(', '),
-      album: sdkCurrentTrack.album.name,
-      duration: formatDuration(sdkCurrentTrack.duration_ms),
-      albumArt: sdkCurrentTrack.album.images?.[0]?.url || 'https://placehold.co/300x300.png',
-    };
-  }, [sdkCurrentTrack]);
+  useEffect(() => {
+    if (playbackSource === 'spotify' && sdkCurrentTrack) {
+        setCurrentTrack({
+          id: sdkCurrentTrack.id!,
+          uri: sdkCurrentTrack.uri,
+          title: sdkCurrentTrack.name,
+          artist: sdkCurrentTrack.artists.map(a => a.name).join(', '),
+          album: sdkCurrentTrack.album.name,
+          duration: formatDuration(sdkCurrentTrack.duration_ms),
+          albumArt: sdkCurrentTrack.album.images?.[0]?.url || 'https://placehold.co/300x300.png',
+        });
+    }
+  }, [sdkCurrentTrack, playbackSource]);
 
   const currentTrackIndex = useMemo(() => {
-      if (!sdkCurrentTrack || !selectedPlaylist) return null;
-      const index = selectedPlaylist.tracks.findIndex(t => t.id === sdkCurrentTrack.id);
+      if (!currentTrack || !selectedPlaylist) return null;
+      const index = selectedPlaylist.tracks.findIndex(t => t.id === currentTrack.id);
       return index > -1 ? index : null;
-  }, [sdkCurrentTrack, selectedPlaylist]);
+  }, [currentTrack, selectedPlaylist]);
 
   useEffect(() => {
     setIsSpotifyConnected(initialIsSpotifyConnected);
@@ -181,21 +199,104 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
     }
   };
 
-  const handleSelectTrack = (trackIndex: number) => {
+  const handleYoutubeSearch = useCallback(async (track: Track) => {
+      setCurrentTrack(track);
+      try {
+        const response = await fetch(`/api/youtube/search?query=${encodeURIComponent(`${track.title} ${track.artist}`)}`);
+        if (!response.ok) throw new Error('YouTube search failed');
+        const data = await response.json();
+        setYoutubeVideoId(data.videoId);
+      } catch (error) {
+        console.error(error);
+        toast({
+            variant: 'destructive',
+            title: 'YouTube Search Failed',
+            description: 'Could not find a matching video on YouTube.'
+        });
+      }
+  }, [toast]);
+
+  const handleSelectTrack = useCallback((trackIndex: number) => {
     if (!selectedPlaylist) return;
     const trackToPlay = selectedPlaylist.tracks[trackIndex];
     
-    if (trackToPlay.id === sdkCurrentTrack?.id) {
-      togglePlay();
+    if (playbackSource === 'spotify') {
+        if (trackToPlay.id === sdkCurrentTrack?.id) {
+            spotifyTogglePlay();
+        } else {
+            const trackUris = selectedPlaylist.tracks.map(t => t.uri);
+            spotifyPlay({ uris: trackUris, offset: { position: trackIndex }});
+        }
     } else {
-      const trackUris = selectedPlaylist.tracks.map(t => t.uri);
-      play({ uris: trackUris, offset: { position: trackIndex }});
+        handleYoutubeSearch(trackToPlay);
     }
+  }, [selectedPlaylist, playbackSource, sdkCurrentTrack, spotifyTogglePlay, spotifyPlay, handleYoutubeSearch]);
+  
+  const handleTogglePlay = useCallback(() => {
+    if (playbackSource === 'spotify') {
+      spotifyTogglePlay();
+    } else if (youtubePlayerRef.current) {
+      const playerState = youtubePlayerRef.current.getPlayerState();
+      if (playerState === 1) { // 1 === playing
+        youtubePlayerRef.current.pauseVideo();
+      } else {
+        youtubePlayerRef.current.playVideo();
+      }
+    }
+  }, [playbackSource, spotifyTogglePlay]);
+
+  const handleNextTrack = useCallback(() => {
+    if (playbackSource === 'spotify') {
+        sdkNextTrack();
+    } else {
+        if (!selectedPlaylist || currentTrackIndex === null) return;
+        const nextIndex = (currentTrackIndex + 1) % selectedPlaylist.tracks.length;
+        handleYoutubeSearch(selectedPlaylist.tracks[nextIndex]);
+    }
+  }, [playbackSource, sdkNextTrack, selectedPlaylist, currentTrackIndex, handleYoutubeSearch]);
+
+  const handlePrevTrack = useCallback(() => {
+    if (playbackSource === 'spotify') {
+        sdkPrevTrack();
+    } else {
+        if (!selectedPlaylist || currentTrackIndex === null) return;
+        const prevIndex = (currentTrackIndex - 1 + selectedPlaylist.tracks.length) % selectedPlaylist.tracks.length;
+        handleYoutubeSearch(selectedPlaylist.tracks[prevIndex]);
+    }
+  }, [playbackSource, sdkPrevTrack, selectedPlaylist, currentTrackIndex, handleYoutubeSearch]);
+
+
+  const handleVolumeChange = useCallback((newVolume: number[]) => {
+    setVolume(newVolume[0]);
+    if (playbackSource === 'spotify') {
+        sdkSetVolume(newVolume[0]);
+    } else if (youtubePlayerRef.current) {
+        youtubePlayerRef.current.setVolume(newVolume[0]);
+    }
+  }, [playbackSource, sdkSetVolume]);
+
+  const handleYoutubeFallback = useCallback(() => {
+    setPlaybackSource('youtube');
+    if (currentTrack) {
+        handleYoutubeSearch(currentTrack);
+    }
+  }, [currentTrack, handleYoutubeSearch]);
+
+  const onYoutubePlayerReady = (event: any) => {
+    youtubePlayerRef.current = event.target;
+    handleVolumeChange([volume]);
   };
   
-  const handleVolumeChange = (newVolume: number[]) => {
-    setVolume(newVolume[0]);
-    sdkSetVolume(newVolume[0]);
+  const onYoutubePlayerStateChange = (event: any) => {
+    // YouTube Player States: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
+    if (event.data === 1) {
+        setIsPlaying(true);
+    } else {
+        setIsPlaying(false);
+    }
+    if (event.data === 0) { // On ended, play next track
+        handleNextTrack();
+    }
   };
 
   const renderSpotifyConnect = () => (
@@ -214,6 +315,17 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
         </div>
       </div>
   );
+
+  const renderYoutubeFallback = () => (
+    <div className="flex flex-col items-center justify-center text-center p-4">
+        <h3 className="text-xl font-headline text-primary">Spotify Premium Required</h3>
+        <p className="text-muted-foreground mt-2 mb-4">Playback via Spotify requires a Premium account.</p>
+        <Button onClick={handleYoutubeFallback}>
+            <Youtube className="mr-2 h-5 w-5" />
+            Fallback to YouTube
+        </Button>
+    </div>
+  )
 
   return (
     <main className="relative min-h-screen w-full p-4 lg:p-8 flex flex-col">
@@ -236,14 +348,30 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
         <>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 flex-grow">
           <div className="lg:col-span-3 flex items-center justify-center p-4 rounded-lg bg-card/50 backdrop-blur-sm border border-primary/10">
+            {playbackSource === 'youtube' && youtubeVideoId && (
+                <YouTube
+                    videoId={youtubeVideoId}
+                    opts={{
+                        height: '0',
+                        width: '0',
+                        playerVars: {
+                          autoplay: 1,
+                        },
+                    }}
+                    onReady={onYoutubePlayerReady}
+                    onStateChange={onYoutubePlayerStateChange}
+                    onError={(e) => console.error('YouTube Player Error:', e)}
+                />
+            )}
             <VinylPlayer
-              track={displayTrack}
-              isPlaying={sdkIsPlaying}
-              onPlayPause={togglePlay}
-              onNext={sdkNextTrack}
-              onPrev={sdkPrevTrack}
+              track={currentTrack}
+              isPlaying={isPlaying}
+              onPlayPause={handleTogglePlay}
+              onNext={handleNextTrack}
+              onPrev={handlePrevTrack}
               volume={volume}
               onVolumeChange={handleVolumeChange}
+              fallbackUI={isPremiumRequiredError && playbackSource === 'spotify' ? renderYoutubeFallback() : undefined}
             />
           </div>
           <div className="lg:col-span-2 h-full">
@@ -254,12 +382,12 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
               onSelectPlaylist={handleSelectPlaylist}
               onSelectTrack={handleSelectTrack}
               onFetchTracks={fetchTracksForPlaylist}
-              isPlaying={sdkIsPlaying}
+              isPlaying={isPlaying}
               isLoading={isLoadingPlaylists}
             />
           </div>
         </div>
-        <MusicPet isPlaying={sdkIsPlaying} />
+        <MusicPet isPlaying={isPlaying} />
         </>
       )}
     </main>

@@ -1,6 +1,6 @@
+
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Track } from '@/lib/types';
 
 declare global {
   interface Window {
@@ -12,6 +12,8 @@ declare global {
 interface PlaybackError {
   message: string;
 }
+
+export type PlayerError = { type: 'initialization' | 'authentication' | 'account', message: string };
 
 interface SpotifyPlayer {
   _options: {
@@ -44,7 +46,7 @@ export function useSpotifyPlayer(accessToken: string | null) {
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [playerState, setPlayerState] = useState<Spotify.PlaybackState | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<PlayerError | null>(null);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -59,7 +61,6 @@ export function useSpotifyPlayer(accessToken: string | null) {
       const spotifyPlayer: SpotifyPlayer = new window.Spotify.Player({
         name: 'T937 Web Player',
         getOAuthToken: (cb: (token: string) => void) => {
-          // This should handle token refreshing in a real app
           if (accessToken) {
             cb(accessToken);
           }
@@ -90,15 +91,15 @@ export function useSpotifyPlayer(accessToken: string | null) {
 
       spotifyPlayer.addListener('initialization_error', ({ message }: PlaybackError) => {
         console.error('Initialization Error:', message);
-        setError('Failed to initialize player. Please refresh.');
+        setError({ type: 'initialization', message: 'Failed to initialize player. Please refresh.'});
       });
       spotifyPlayer.addListener('authentication_error', ({ message }: PlaybackError) => {
         console.error('Authentication Error:', message);
-        setError('Authentication failed. Please reconnect Spotify.');
+        setError({ type: 'authentication', message: 'Authentication failed. Please reconnect Spotify.'});
       });
       spotifyPlayer.addListener('account_error', ({ message }: PlaybackError) => {
         console.error('Account Error:', message);
-        setError('Spotify Premium is required for playback.');
+        setError({ type: 'account', message: 'Spotify Premium is required for playback.'});
       });
       
       spotifyPlayer.connect();
@@ -114,11 +115,12 @@ export function useSpotifyPlayer(accessToken: string | null) {
 
   const play = useCallback(async ({ uris, offset }: PlayOptions) => {
     if (!deviceId || !accessToken) {
-      setError("Player is not ready.");
+      setError({ type: 'initialization', message: "Player is not ready."});
       return;
     }
 
     try {
+      setError(null);
       const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
         method: 'PUT',
         body: JSON.stringify({ uris, offset }),
@@ -128,12 +130,16 @@ export function useSpotifyPlayer(accessToken: string | null) {
         },
       });
       if (!response.ok) {
-        throw new Error('Failed to start playback.');
+        const errorData = await response.json();
+        if (errorData.error.reason === 'PREMIUM_REQUIRED') {
+             setError({ type: 'account', message: 'Spotify Premium is required for playback.'});
+        } else {
+            throw new Error('Failed to start playback.');
+        }
       }
-      setError(null);
     } catch (e) {
       console.error(e);
-      setError("Could not start playback.");
+      setError({ type: 'initialization', message: "Could not start playback."});
     }
   }, [deviceId, accessToken]);
 
