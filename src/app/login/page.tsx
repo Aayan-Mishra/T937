@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Github } from 'lucide-react';
 
 const StaticPet = () => (
     <div className="absolute bottom-5 left-5 z-20" title="T-937's little helper!">
@@ -67,13 +66,6 @@ export default function LoginPage() {
 
   return (
     <main className="relative flex flex-col items-center justify-center min-h-screen p-4 bg-background text-foreground">
-        <div className="absolute top-4 right-4">
-            <Button variant="ghost" size="icon" asChild>
-                <a href="https://github.com/firebase/firebase-genkit" target="_blank" rel="noopener noreferrer" aria-label="Github repository">
-                    <Github className="h-6 w-6 text-accent" />
-                </a>
-            </Button>
-        </div>
       <Card className="w-full max-w-sm bg-card border-primary/20 shadow-lg">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-headline text-primary">T937</CardTitle>

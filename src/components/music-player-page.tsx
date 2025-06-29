@@ -10,9 +10,19 @@ import type { Playlist, Track } from "@/lib/types";
 import { PlaylistView } from "@/components/playlist-view";
 import { VinylPlayer } from "@/components/vinyl-player";
 import { Button } from "@/components/ui/button";
-import { Github, LogOut, Music, Youtube } from "lucide-react";
+import { LogOut, Music, Youtube, Settings, Check } from "lucide-react";
 import { useSpotifyPlayer } from "@/hooks/use-spotify-player";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme } from "next-themes";
+import { 
+    DropdownMenu, 
+    DropdownMenuContent, 
+    DropdownMenuItem, 
+    DropdownMenuLabel, 
+    DropdownMenuSeparator, 
+    DropdownMenuTrigger 
+} from "./ui/dropdown-menu";
+
 
 const MusicPet = ({ isPlaying }: { isPlaying: boolean }) => {
   return (
@@ -53,6 +63,7 @@ const MusicPet = ({ isPlaying }: { isPlaying: boolean }) => {
 export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConnected, accessToken }: { user: User, isSpotifyConnected: boolean, accessToken: string | null }) {
   const router = useRouter();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const [isSpotifyConnected, setIsSpotifyConnected] = useState(initialIsSpotifyConnected);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
@@ -383,13 +394,31 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
     <main className="relative min-h-screen w-full p-4 lg:p-8 flex flex-col">
       <div className="absolute inset-0 bg-background -z-10"></div>
       <div className="absolute top-4 right-4 flex items-center gap-2">
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Settings">
+                    <Settings className="h-6 w-6 text-accent" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuLabel>Theme</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setTheme('light')}>
+                    Light
+                    {theme === 'light' && <Check className="ml-auto h-4 w-4" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('dark')}>
+                    Dark
+                    {theme === 'dark' && <Check className="ml-auto h-4 w-4" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('system')}>
+                    System
+                    {theme === 'system' && <Check className="ml-auto h-4 w-4" />}
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
         <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Log out">
             <LogOut className="h-6 w-6 text-accent" />
-        </Button>
-        <Button variant="ghost" size="icon" asChild>
-          <a href="https://github.com/firebase/firebase-genkit" target="_blank" rel="noopener noreferrer" aria-label="Github repository">
-            <Github className="h-6 w-6 text-accent" />
-          </a>
         </Button>
       </div>
       <header className="text-center mb-8">
