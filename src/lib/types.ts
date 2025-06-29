@@ -4,7 +4,7 @@ export interface Track {
   title: string;
   artist: string;
   album: string;
-  duration: string;
+  duration: number; // duration in ms
   albumArt: string;
 }
 

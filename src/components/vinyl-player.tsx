@@ -5,7 +5,7 @@ import type { Track } from "@/lib/types";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume1, Volume2, VolumeX, Repeat } from "lucide-react";
 import Image from 'next/image';
 
 interface VinylPlayerProps {
@@ -17,7 +17,20 @@ interface VinylPlayerProps {
   volume: number;
   onVolumeChange: (volume: number[]) => void;
   fallbackUI?: React.ReactNode;
+  progress: number;
+  duration: number;
+  onSeek: (time: number[]) => void;
+  isLooping: boolean;
+  onLoopToggle: () => void;
 }
+
+const formatTime = (ms: number) => {
+    if (isNaN(ms) || ms < 0) return '0:00';
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
 
 export function VinylPlayer({
   track,
@@ -27,7 +40,12 @@ export function VinylPlayer({
   onPrev,
   volume,
   onVolumeChange,
-  fallbackUI
+  fallbackUI,
+  progress,
+  duration,
+  onSeek,
+  isLooping,
+  onLoopToggle
 }: VinylPlayerProps) {
   
   const VolumeIcon = () => {
@@ -39,45 +57,63 @@ export function VinylPlayer({
   return (
     <div className="flex flex-col items-center justify-center h-full w-full">
       <div 
-        className="relative w-80 h-80 md:w-96 md:h-96 transition-all duration-500"
-        style={{ animation: isPlaying ? 'shadow-pulse 2s infinite' : 'none' }}
+        className="relative w-80 h-80 md:w-96 md:h-96"
       >
-        <div className={`relative w-full h-full rounded-full shadow-2xl overflow-hidden bg-neutral-900 transition-transform duration-300 ${isPlaying ? 'animate-spin-slow' : ''}`}>
-            {/* Album art image */}
+        <div className={`relative w-full h-full rounded-full shadow-2xl overflow-hidden transition-transform duration-300 ${isPlaying ? 'animate-spin-slow' : ''}`}>
             <Image
-                src={track?.albumArt || "https://placehold.co/400x400.png"}
+                src={track?.albumArt || "https://placehold.co/400x400/111111/111111.png"}
                 alt={track?.album || "Vinyl Record"}
                 fill
                 sizes="(max-width: 768px) 320px, 384px"
-                className={`object-cover transition-opacity duration-500 ease-in-out ${track ? 'opacity-100' : 'opacity-0'}`}
+                className={`object-cover rounded-full transition-opacity duration-500 ease-in-out`}
                 data-ai-hint="album cover"
             />
-             {/* Spindle hole */}
             <div className="absolute top-1/2 left-1/2 w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background border border-neutral-400 z-10"></div>
         </div>
       </div>
 
       <Card className="w-full max-w-md mt-8 bg-transparent border-none shadow-none">
-        <CardHeader className="text-center min-h-[90px]">
-          <CardTitle className="text-3xl font-headline text-primary">{track?.title || "Select a song"}</CardTitle>
-          <CardDescription className="text-lg text-muted-foreground">{track?.artist || "to start playing"}</CardDescription>
+        <CardHeader className="text-center min-h-[90px] p-4">
+          <CardTitle className="text-3xl font-headline text-primary truncate">{track?.title || "Select a song"}</CardTitle>
+          <CardDescription className="text-lg text-muted-foreground truncate">{track?.artist || "to start playing"}</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col items-center gap-4 min-h-[80px]">
-          {fallbackUI || (
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={onPrev} disabled={!track} aria-label="Previous track">
-                <SkipBack className="w-8 h-8 text-accent" />
-              </Button>
-              <Button variant="ghost" size="icon" className="w-16 h-16" onClick={onPlayPause} disabled={!track} aria-label={isPlaying ? 'Pause' : 'Play'}>
-                {isPlaying ? <Pause className="w-12 h-12 text-primary fill-primary" /> : <Play className="w-12 h-12 text-primary fill-primary" />}
-              </Button>
-              <Button variant="ghost" size="icon" onClick={onNext} disabled={!track} aria-label="Next track">
-                <SkipForward className="w-8 h-8 text-accent" />
-              </Button>
+        <CardContent className="flex flex-col items-center gap-2">
+            {track && (
+              <div className="w-full max-w-sm px-2">
+                  <Slider
+                      value={[progress]}
+                      max={duration}
+                      step={1000}
+                      onValueChange={onSeek}
+                      disabled={!track}
+                      aria-label="Song progress"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>{formatTime(progress)}</span>
+                      <span>{formatTime(duration)}</span>
+                  </div>
+              </div>
+            )}
+            <div className="flex items-center gap-4 mt-2">
+              {fallbackUI || (
+                <>
+                  <Button variant="ghost" size="icon" onClick={onPrev} disabled={!track} aria-label="Previous track">
+                    <SkipBack className="w-8 h-8 text-accent" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="w-16 h-16" onClick={onPlayPause} disabled={!track} aria-label={isPlaying ? 'Pause' : 'Play'}>
+                    {isPlaying ? <Pause className="w-12 h-12 text-primary fill-primary" /> : <Play className="w-12 h-12 text-primary fill-primary" />}
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={onNext} disabled={!track} aria-label="Next track">
+                    <SkipForward className="w-8 h-8 text-accent" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={onLoopToggle} disabled={!track} aria-label="Toggle loop">
+                    <Repeat className={`w-6 h-6 ${isLooping ? 'text-primary' : 'text-accent'}`} />
+                  </Button>
+                </>
+              )}
             </div>
-          )}
         </CardContent>
-        <CardFooter className="flex items-center gap-4 justify-center">
+        <CardFooter className="flex items-center gap-4 justify-center mt-2">
           <VolumeIcon />
           <Slider
             value={[volume]}

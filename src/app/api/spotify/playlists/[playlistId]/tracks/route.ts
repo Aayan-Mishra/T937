@@ -2,12 +2,6 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import type { Track } from '@/lib/types';
 
-function formatDuration(ms: number): string {
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Number(((ms % 60000) / 1000).toFixed(0));
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
 async function fetchFromSpotify(url: string, accessToken: string) {
     const response = await fetch(url, {
         headers: {
@@ -49,7 +43,7 @@ export async function GET(
                     title: track.name,
                     artist: track.artists.map((a: any) => a.name).join(', '),
                     album: track.album.name,
-                    duration: formatDuration(track.duration_ms),
+                    duration: track.duration_ms,
                     albumArt: track.album.images?.[0]?.url || 'https://placehold.co/300x300.png',
                 };
             })

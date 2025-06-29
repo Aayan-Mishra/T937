@@ -121,7 +121,7 @@ export function useSpotifyPlayer(accessToken: string | null) {
 
     try {
       setError(null);
-      const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+      await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
         method: 'PUT',
         body: JSON.stringify({ uris, offset }),
         headers: {
@@ -129,23 +129,27 @@ export function useSpotifyPlayer(accessToken: string | null) {
           'Authorization': `Bearer ${accessToken}`,
         },
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (errorData.error.reason === 'PREMIUM_REQUIRED') {
-             setError({ type: 'account', message: 'Spotify Premium is required for playback.'});
-        } else {
-            throw new Error('Failed to start playback.');
-        }
-      }
     } catch (e) {
       console.error(e);
       setError({ type: 'initialization', message: "Could not start playback."});
     }
   }, [deviceId, accessToken]);
 
+  const setRepeat = useCallback(async (state: 'track' | 'context' | 'off') => {
+      if (!deviceId) return;
+      try {
+        await fetch(`/api/spotify/player/repeat?device_id=${deviceId}&state=${state}`, {
+            method: 'PUT',
+        });
+      } catch (e) {
+        console.error("Failed to set repeat mode", e);
+      }
+  }, [deviceId]);
+
   const togglePlay = useCallback(() => playerRef.current?.togglePlay(), []);
   const nextTrack = useCallback(() => playerRef.current?.nextTrack(), []);
   const previousTrack = useCallback(() => playerRef.current?.previousTrack(), []);
+  const seek = useCallback((position_ms: number) => playerRef.current?.seek(position_ms), []);
   const setVolume = useCallback((volume: number) => playerRef.current?.setVolume(volume / 100), []);
 
   const currentTrack = playerState?.track_window.current_track;
@@ -156,9 +160,13 @@ export function useSpotifyPlayer(accessToken: string | null) {
     togglePlay,
     nextTrack,
     previousTrack,
+    seek,
     setVolume,
+    setRepeat,
     currentTrack,
     isPlaying,
-    error
+    playerState,
+    error,
+    deviceId
   };
 }

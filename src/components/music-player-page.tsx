@@ -51,13 +51,6 @@ const MusicPet = ({ isPlaying }: { isPlaying: boolean }) => {
   );
 };
 
-function formatDuration(ms: number): string {
-  if (isNaN(ms)) return '0:00';
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Number(((ms % 60000) / 1000).toFixed(0));
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
 export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConnected, accessToken }: { user: User, isSpotifyConnected: boolean, accessToken: string | null }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -70,9 +63,13 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(50);
+  const [isLooping, setIsLooping] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
   const youtubePlayerRef = useRef<any>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   const { 
     play: spotifyPlay, 
@@ -80,9 +77,13 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
     nextTrack: sdkNextTrack,
     previousTrack: sdkPrevTrack,
     setVolume: sdkSetVolume,
+    seek: sdkSeek,
+    setRepeat: sdkSetRepeat,
+    playerState: sdkPlayerState,
     currentTrack: sdkCurrentTrack, 
     isPlaying: sdkIsPlaying,
-    error: sdkError
+    error: sdkError,
+    deviceId
   } = useSpotifyPlayer(accessToken);
 
   const isPremiumRequiredError = sdkError?.type === 'account';
@@ -100,8 +101,13 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
   useEffect(() => {
     if (playbackSource === 'spotify') {
       setIsPlaying(sdkIsPlaying);
+      if (sdkPlayerState) {
+        setProgress(sdkPlayerState.position);
+        setDuration(sdkPlayerState.duration);
+        setIsLooping(sdkPlayerState.repeat_mode === 1); // 1 is for track repeat
+      }
     }
-  }, [sdkIsPlaying, playbackSource]);
+  }, [sdkIsPlaying, playbackSource, sdkPlayerState]);
 
   useEffect(() => {
     if (playbackSource === 'spotify' && sdkCurrentTrack) {
@@ -111,11 +117,32 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
           title: sdkCurrentTrack.name,
           artist: sdkCurrentTrack.artists.map(a => a.name).join(', '),
           album: sdkCurrentTrack.album.name,
-          duration: formatDuration(sdkCurrentTrack.duration_ms),
+          duration: sdkCurrentTrack.duration_ms,
           albumArt: sdkCurrentTrack.album.images?.[0]?.url || 'https://placehold.co/300x300.png',
         });
     }
   }, [sdkCurrentTrack, playbackSource]);
+
+  useEffect(() => {
+    if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+    }
+    if (isPlaying) {
+        progressIntervalRef.current = setInterval(() => {
+            if (playbackSource === 'spotify' && sdkPlayerState) {
+                setProgress(prev => prev + 1000 > sdkPlayerState.duration ? sdkPlayerState.duration : prev + 1000);
+            } else if (playbackSource === 'youtube' && youtubePlayerRef.current) {
+                const newProgress = youtubePlayerRef.current.getCurrentTime() * 1000;
+                setProgress(newProgress);
+            }
+        }, 1000);
+    }
+    return () => {
+        if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+        }
+    };
+  }, [isPlaying, playbackSource, sdkPlayerState]);
 
   const currentTrackIndex = useMemo(() => {
       if (!currentTrack || !selectedPlaylist) return null;
@@ -201,6 +228,8 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
 
   const handleYoutubeSearch = useCallback(async (track: Track) => {
       setCurrentTrack(track);
+      setDuration(track.duration);
+      setProgress(0);
       try {
         const response = await fetch(`/api/youtube/search?query=${encodeURIComponent(`${track.title} ${track.artist}`)}`);
         if (!response.ok) throw new Error('YouTube search failed');
@@ -265,6 +294,24 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
     }
   }, [playbackSource, sdkPrevTrack, selectedPlaylist, currentTrackIndex, handleYoutubeSearch]);
 
+  const handleSeek = useCallback((newProgress: number[]) => {
+      const newTime = newProgress[0];
+      setProgress(newTime);
+      if (playbackSource === 'spotify') {
+          sdkSeek(newTime);
+      } else if (youtubePlayerRef.current) {
+          youtubePlayerRef.current.seekTo(newTime / 1000, true);
+      }
+  }, [playbackSource, sdkSeek]);
+
+  const handleLoopToggle = useCallback(() => {
+      const newLoopState = !isLooping;
+      setIsLooping(newLoopState);
+      if (playbackSource === 'spotify') {
+          sdkSetRepeat(newLoopState ? 'track' : 'off');
+      }
+  }, [isLooping, playbackSource, sdkSetRepeat]);
+
 
   const handleVolumeChange = useCallback((newVolume: number[]) => {
     setVolume(newVolume[0]);
@@ -289,13 +336,19 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
   
   const onYoutubePlayerStateChange = (event: any) => {
     // YouTube Player States: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
-    if (event.data === 1) {
+    if (event.data === 1) { // Playing
         setIsPlaying(true);
-    } else {
+        setDuration(youtubePlayerRef.current.getDuration() * 1000);
+    } else { // Paused, ended, etc.
         setIsPlaying(false);
     }
-    if (event.data === 0) { // On ended, play next track
-        handleNextTrack();
+    if (event.data === 0) { // On ended, play next track or loop
+        if (isLooping) {
+            youtubePlayerRef.current.seekTo(0);
+            youtubePlayerRef.current.playVideo();
+        } else {
+            handleNextTrack();
+        }
     }
   };
 
@@ -372,6 +425,11 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
               volume={volume}
               onVolumeChange={handleVolumeChange}
               fallbackUI={isPremiumRequiredError && playbackSource === 'spotify' ? renderYoutubeFallback() : undefined}
+              progress={progress}
+              duration={duration}
+              onSeek={handleSeek}
+              isLooping={isLooping}
+              onLoopToggle={handleLoopToggle}
             />
           </div>
           <div className="lg:col-span-2 h-full">
