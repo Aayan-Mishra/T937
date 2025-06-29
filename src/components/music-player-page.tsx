@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import type { User } from 'firebase/auth';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { playlists as mockPlaylists } from "@/lib/mock-data";
 import type { Playlist, Track } from "@/lib/types";
 import { PlaylistView } from "@/components/playlist-view";
 import { VinylPlayer } from "@/components/vinyl-player";
@@ -20,23 +19,47 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(50);
+  const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(true);
   
   useEffect(() => {
     setIsSpotifyConnected(initialIsSpotifyConnected);
   }, [initialIsSpotifyConnected]);
 
   useEffect(() => {
-    if (isSpotifyConnected) {
-      // TODO: Fetch playlists from Spotify API instead of using mock data
-      setPlaylists(mockPlaylists);
-      if (mockPlaylists.length > 0) {
-        setSelectedPlaylist(mockPlaylists[0]);
+    const fetchPlaylists = async () => {
+      setIsLoadingPlaylists(true);
+      try {
+        const response = await fetch('/api/spotify/playlists');
+        if (!response.ok) {
+          if (response.status === 401) {
+            // Token expired, prompt for re-login by clearing state
+            setIsSpotifyConnected(false);
+            document.cookie = 'spotify_access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+            document.cookie = 'spotify_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+          }
+          throw new Error('Failed to fetch playlists');
+        }
+        const data: Playlist[] = await response.json();
+        setPlaylists(data);
+        if (data.length > 0) {
+          // Don't autoselect a playlist
+        }
+      } catch (error) {
+        console.error(error);
+        setPlaylists([]);
+      } finally {
+        setIsLoadingPlaylists(false);
       }
+    };
+
+    if (isSpotifyConnected) {
+      fetchPlaylists();
     } else {
       setPlaylists([]);
       setSelectedPlaylist(null);
       setCurrentTrackIndex(null);
       setIsPlaying(false);
+      setIsLoadingPlaylists(false);
     }
   }, [isSpotifyConnected]);
   
@@ -54,9 +77,52 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
 
   const handleSelectPlaylist = (playlist: Playlist) => {
     setSelectedPlaylist(playlist);
-    setCurrentTrackIndex(0);
-    setIsPlaying(true);
+    if (playlist.tracks.length > 0) {
+      setCurrentTrackIndex(0);
+      setIsPlaying(true);
+    } else {
+      setCurrentTrackIndex(null);
+      setIsPlaying(false);
+    }
   };
+
+  const fetchTracksForPlaylist = async (playlistId: string): Promise<void> => {
+    const playlistIndex = playlists.findIndex(p => p.id === playlistId);
+    if (playlistIndex === -1 || playlists[playlistIndex].tracks.length > 0) {
+      return; // Already fetched or does not exist.
+    }
+
+    try {
+      const response = await fetch(`/api/spotify/playlists/${playlistId}/tracks`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tracks for ${playlistId}`);
+      }
+      const tracks: Track[] = await response.json();
+
+      setPlaylists(prevPlaylists => {
+        const newPlaylists = [...prevPlaylists];
+        newPlaylists[playlistIndex].tracks = tracks;
+        return newPlaylists;
+      });
+
+      // If this is the currently selected playlist, update it and start playing
+      if (selectedPlaylist?.id === playlistId) {
+        const updatedPlaylist = { ...playlists[playlistIndex], tracks };
+        setSelectedPlaylist(updatedPlaylist);
+        if (tracks.length > 0) {
+          setCurrentTrackIndex(0);
+          setIsPlaying(true);
+        } else {
+          setCurrentTrackIndex(null);
+          setIsPlaying(false);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      // Optionally handle error state for the specific playlist
+    }
+  };
+
 
   const handleSelectTrack = (trackIndex: number) => {
     if (selectedPlaylist) {
@@ -149,7 +215,9 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
               currentTrackIndex={currentTrackIndex}
               onSelectPlaylist={handleSelectPlaylist}
               onSelectTrack={handleSelectTrack}
+              onFetchTracks={fetchTracksForPlaylist}
               isPlaying={isPlaying}
+              isLoading={isLoadingPlaylists}
             />
           </div>
         </div>

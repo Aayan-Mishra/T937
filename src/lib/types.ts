@@ -8,8 +8,10 @@ export interface Track {
 }
 
 export interface Playlist {
-  id:string;
+  id: string;
   name: string;
   description: string;
   tracks: Track[];
+  tracksHref: string;
+  coverArt: string;
 }
