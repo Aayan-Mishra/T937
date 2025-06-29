@@ -42,9 +42,7 @@ export function VinylPlayer({
         className="relative w-80 h-80 md:w-96 md:h-96 transition-all duration-500"
         style={{ animation: isPlaying ? 'shadow-pulse 2s infinite' : 'none' }}
       >
-        <div className={`relative w-full h-full rounded-full shadow-2xl overflow-hidden transition-transform duration-300 ${isPlaying ? 'animate-spin-slow' : ''}`}>
-            {/* Black vinyl background */}
-            <div className="absolute inset-0 w-full h-full bg-neutral-900"></div>
+        <div className={`relative w-full h-full rounded-full shadow-2xl overflow-hidden bg-neutral-900 transition-transform duration-300 ${isPlaying ? 'animate-spin-slow' : ''}`}>
             {/* Album art image */}
             <Image
                 src={track?.albumArt || "https://placehold.co/400x400.png"}
