@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Music2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { Separator } from "./ui/separator";
 
 interface PlaylistViewProps {
   playlists: Playlist[];
@@ -70,7 +71,7 @@ export function PlaylistView({
         coverArt: '',
       };
       setSearchResultsPlaylist(newSearchResultsPlaylist);
-      onSelectPlaylist(newSearchResultsPlaylist); // Automatically select search results
+      onSelectPlaylist(newSearchResultsPlaylist);
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -90,10 +91,12 @@ export function PlaylistView({
     }
   };
 
-  const handleAccordionTriggerClick = (playlist: Playlist) => {
+  const handlePlaylistClick = (playlist: Playlist) => {
     onSelectPlaylist(playlist);
-    // Don't fetch tracks for search results playlist as they are already loaded
-    if (playlist.id !== 'search-results' && playlist.tracks.length === 0) {
+    setSearchResultsPlaylist(null);
+    setSearchQuery('');
+    
+    if (playlist.tracks.length === 0) {
       setLoadingTracks(prev => new Set(prev).add(playlist.id));
       onFetchTracks(playlist.id).finally(() => {
         setLoadingTracks(prev => {
@@ -107,13 +110,9 @@ export function PlaylistView({
 
   const renderTrackList = (playlist: Playlist) => (
     <ul>
-      {playlist.tracks.length === 0 && (playlist.id === 'search-results' && !isSearching) ? (
+      {playlist.tracks.length === 0 ? (
         <li className="p-3 text-muted-foreground italic">
           No results found.
-        </li>
-      ) : playlist.tracks.length === 0 && playlist.id !== 'search-results' ? (
-        <li className="p-3 text-muted-foreground italic">
-          This playlist appears to be empty.
         </li>
       ) : (
         playlist.tracks.map((track, index) => (
@@ -156,7 +155,7 @@ export function PlaylistView({
     );
   }
   
-  if (playlists.length === 0) {
+  if (playlists.length === 0 && !isSearching && !searchResultsPlaylist) {
      return (
       <Card className="h-full w-full bg-transparent border-2 border-dashed border-primary/20 shadow-lg backdrop-blur-sm rounded-lg flex items-center justify-center">
         <div className="text-center p-4">
@@ -173,66 +172,70 @@ export function PlaylistView({
         <CardTitle className="text-2xl font-headline text-primary">Your Music</CardTitle>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col min-h-0">
-        <div className="flex w-full items-center space-x-2 px-6 pb-4">
-          <Input
-            placeholder="Search for songs..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          />
-          <Button type="submit" size="icon" onClick={handleSearch} disabled={isSearching}>
-            <Search className="h-4 w-4" />
-          </Button>
+        <div className="px-6 pb-4">
+          <div className="flex w-full items-center space-x-2">
+            <Input
+              placeholder="Search for songs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            />
+            <Button type="submit" size="icon" onClick={handleSearch} disabled={isSearching}>
+              <Search className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        <ScrollArea className="h-full pr-4 pl-2">
-          <Accordion type="single" collapsible value={selectedPlaylist?.id}>
-            {(isSearching || searchResultsPlaylist) && (
-              <AccordionItem value="search-results">
-                <AccordionTrigger
-                  className="text-lg font-headline hover:text-primary"
-                  onClick={() => searchResultsPlaylist && handleAccordionTriggerClick(searchResultsPlaylist)}
-                  disabled={!searchResultsPlaylist}
-                >
-                  Search Results
-                </AccordionTrigger>
-                <AccordionContent>
-                  {isSearching ? (
-                    <div className="space-y-2 p-3">
-                      <Skeleton className="h-6 w-full" />
-                      <Skeleton className="h-6 w-2/3" />
-                      <Skeleton className="h-6 w-full" />
-                    </div>
-                  ) : (
-                    searchResultsPlaylist && renderTrackList(searchResultsPlaylist)
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            )}
+        {isSearching && (
+          <div className="px-6 pb-4">
+            <h3 className="text-lg font-headline text-muted-foreground mb-2">Searching...</h3>
+            <div className="space-y-2 p-3">
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-2/3" />
+              <Skeleton className="h-6 w-full" />
+            </div>
+          </div>
+        )}
 
-            {playlists.map((playlist) => (
-              <AccordionItem value={playlist.id} key={playlist.id}>
-                <AccordionTrigger
-                  className="text-lg font-headline hover:text-primary"
-                  onClick={() => handleAccordionTriggerClick(playlist)}
-                >
-                  {playlist.name}
-                </AccordionTrigger>
-                <AccordionContent>
-                  {loadingTracks.has(playlist.id) ? (
-                    <div className="space-y-2 p-3">
-                      <Skeleton className="h-6 w-full" />
-                      <Skeleton className="h-6 w-2/3" />
-                      <Skeleton className="h-6 w-full" />
-                    </div>
-                  ) : (
-                    renderTrackList(playlist)
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </ScrollArea>
+        {searchResultsPlaylist && (
+          <div className="px-6 pb-4">
+            <h3 className="text-lg font-headline text-muted-foreground mb-2">Search Results</h3>
+            <ScrollArea className="h-full max-h-64 pr-4">
+              {renderTrackList(searchResultsPlaylist)}
+            </ScrollArea>
+          </div>
+        )}
+
+        {(isSearching || searchResultsPlaylist) && <Separator className="mb-4 mx-6" />}
+
+        <div className="flex-grow flex flex-col min-h-0">
+          <h3 className="text-lg font-headline text-muted-foreground mb-2 px-6">Your Playlists</h3>
+          <ScrollArea className="h-full pr-4 pl-2">
+            <Accordion type="single" collapsible value={selectedPlaylist?.id !== 'search-results' ? selectedPlaylist?.id : undefined}>
+              {playlists.map((playlist) => (
+                <AccordionItem value={playlist.id} key={playlist.id}>
+                  <AccordionTrigger
+                    className="text-lg font-headline hover:text-primary"
+                    onClick={() => handlePlaylistClick(playlist)}
+                  >
+                    {playlist.name}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {loadingTracks.has(playlist.id) ? (
+                      <div className="space-y-2 p-3">
+                        <Skeleton className="h-6 w-full" />
+                        <Skeleton className="h-6 w-2/3" />
+                        <Skeleton className="h-6 w-full" />
+                      </div>
+                    ) : (
+                      renderTrackList(playlist)
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   );
