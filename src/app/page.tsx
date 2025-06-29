@@ -16,11 +16,21 @@ function getSpotifyCookie() {
     return !!cookieValue;
 }
 
+function getSpotifyAccessToken() {
+    if (typeof window === 'undefined') return null;
+    const cookieValue = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('spotify_access_token='))
+        ?.split('=')[1];
+    return cookieValue || null;
+}
+
 
 export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
+  const [accessToken, setAccessToken] = useState<string|null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -29,18 +39,23 @@ export default function Home() {
   }, [user, loading, router]);
   
   useEffect(() => {
-    // Check for cookie changes, e.g., after Spotify redirect
-    const checkCookie = () => setIsSpotifyConnected(getSpotifyCookie());
+    const checkCookie = () => {
+        const connected = getSpotifyCookie();
+        setIsSpotifyConnected(connected);
+        if (connected) {
+            setAccessToken(getSpotifyAccessToken());
+        } else {
+            setAccessToken(null);
+        }
+    };
     checkCookie();
-    // Re-check when the page becomes visible, in case of redirects
     document.addEventListener('visibilitychange', checkCookie);
     return () => document.removeEventListener('visibilitychange', checkCookie);
   }, []);
 
   if (loading || !user) {
-    // AuthProvider shows a loading skeleton, so we can return null here
     return null;
   }
 
-  return <MusicPlayerPage user={user} isSpotifyConnected={isSpotifyConnected} />;
+  return <MusicPlayerPage user={user} isSpotifyConnected={isSpotifyConnected} accessToken={accessToken} />;
 }

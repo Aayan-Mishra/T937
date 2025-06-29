@@ -45,6 +45,7 @@ export async function GET(
                 if (!track || !track.id) return null; // Filter out local or unplayable tracks
                 return {
                     id: track.id,
+                    uri: track.uri,
                     title: track.name,
                     artist: track.artists.map((a: any) => a.name).join(', '),
                     album: track.album.name,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from 'next/navigation';
 import type { User } from 'firebase/auth';
 import { signOut } from 'firebase/auth';
@@ -10,6 +10,15 @@ import { PlaylistView } from "@/components/playlist-view";
 import { VinylPlayer } from "@/components/vinyl-player";
 import { Button } from "@/components/ui/button";
 import { Github, LogOut, Music } from "lucide-react";
+import { useSpotifyPlayer } from "@/hooks/use-spotify-player";
+import { useToast } from "@/hooks/use-toast";
+
+function formatDuration(ms: number): string {
+  if (isNaN(ms)) return '0:00';
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Number(((ms % 60000) / 1000).toFixed(0));
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
 
 const MusicPet = ({ isPlaying }: { isPlaying: boolean }) => {
   return (
@@ -47,28 +56,70 @@ const MusicPet = ({ isPlaying }: { isPlaying: boolean }) => {
   );
 };
 
-export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConnected }: { user: User, isSpotifyConnected: boolean }) {
+export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConnected, accessToken }: { user: User, isSpotifyConnected: boolean, accessToken: string | null }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [isSpotifyConnected, setIsSpotifyConnected] = useState(initialIsSpotifyConnected);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(50);
   const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(true);
+  const [volume, setVolume] = useState(50);
   
+  const { 
+    play, 
+    togglePlay, 
+    nextTrack: sdkNextTrack,
+    previousTrack: sdkPrevTrack,
+    setVolume: sdkSetVolume,
+    currentTrack: sdkCurrentTrack, 
+    isPlaying: sdkIsPlaying,
+    error: sdkError
+  } = useSpotifyPlayer(accessToken);
+
+  useEffect(() => {
+    if (sdkError) {
+      toast({
+        variant: "destructive",
+        title: "Playback Error",
+        description: sdkError,
+      });
+    }
+  }, [sdkError, toast]);
+
+  const displayTrack = useMemo<Track | null>(() => {
+    if (!sdkCurrentTrack) return null;
+    return {
+      id: sdkCurrentTrack.id!,
+      uri: sdkCurrentTrack.uri,
+      title: sdkCurrentTrack.name,
+      artist: sdkCurrentTrack.artists.map(a => a.name).join(', '),
+      album: sdkCurrentTrack.album.name,
+      duration: formatDuration(sdkCurrentTrack.duration_ms),
+      albumArt: sdkCurrentTrack.album.images?.[0]?.url || 'https://placehold.co/300x300.png',
+    };
+  }, [sdkCurrentTrack]);
+
+  const currentTrackIndex = useMemo(() => {
+      if (!sdkCurrentTrack || !selectedPlaylist) return null;
+      const index = selectedPlaylist.tracks.findIndex(t => t.id === sdkCurrentTrack.id);
+      return index > -1 ? index : null;
+  }, [sdkCurrentTrack, selectedPlaylist]);
+
   useEffect(() => {
     setIsSpotifyConnected(initialIsSpotifyConnected);
   }, [initialIsSpotifyConnected]);
 
   useEffect(() => {
     const fetchPlaylists = async () => {
+      if (!accessToken) {
+        setIsLoadingPlaylists(false);
+        return;
+      }
       setIsLoadingPlaylists(true);
       try {
         const response = await fetch('/api/spotify/playlists');
         if (!response.ok) {
           if (response.status === 401) {
-            // Token expired, prompt for re-login by clearing state
             setIsSpotifyConnected(false);
             document.cookie = 'spotify_access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
             document.cookie = 'spotify_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
@@ -77,9 +128,6 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
         }
         const data: Playlist[] = await response.json();
         setPlaylists(data);
-        if (data.length > 0) {
-          // Don't autoselect a playlist
-        }
       } catch (error) {
         console.error(error);
         setPlaylists([]);
@@ -93,46 +141,30 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
     } else {
       setPlaylists([]);
       setSelectedPlaylist(null);
-      setCurrentTrackIndex(null);
-      setIsPlaying(false);
       setIsLoadingPlaylists(false);
     }
-  }, [isSpotifyConnected]);
+  }, [isSpotifyConnected, accessToken]);
   
   const handleLogout = async () => {
     await signOut(auth);
-    // Also clear spotify cookies
     document.cookie = 'spotify_access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     document.cookie = 'spotify_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     router.push('/login');
   };
 
-  const currentTrack: Track | null = selectedPlaylist && currentTrackIndex !== null
-    ? selectedPlaylist.tracks[currentTrackIndex]
-    : null;
-
   const handleSelectPlaylist = (playlist: Playlist) => {
     setSelectedPlaylist(playlist);
-    if (playlist.tracks.length > 0) {
-      setCurrentTrackIndex(0);
-      setIsPlaying(true);
-    } else {
-      setCurrentTrackIndex(null);
-      setIsPlaying(false);
-    }
   };
 
   const fetchTracksForPlaylist = async (playlistId: string): Promise<void> => {
     const playlistIndex = playlists.findIndex(p => p.id === playlistId);
     if (playlistIndex === -1 || playlists[playlistIndex].tracks.length > 0) {
-      return; // Already fetched or does not exist.
+      return;
     }
 
     try {
       const response = await fetch(`/api/spotify/playlists/${playlistId}/tracks`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tracks for ${playlistId}`);
-      }
+      if (!response.ok) throw new Error(`Failed to fetch tracks for ${playlistId}`);
       const tracks: Track[] = await response.json();
 
       setPlaylists(prevPlaylists => {
@@ -141,60 +173,29 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
         return newPlaylists;
       });
 
-      // If this is the currently selected playlist, update it and start playing
       if (selectedPlaylist?.id === playlistId) {
-        const updatedPlaylist = { ...playlists[playlistIndex], tracks };
-        setSelectedPlaylist(updatedPlaylist);
-        if (tracks.length > 0) {
-          setCurrentTrackIndex(0);
-          setIsPlaying(true);
-        } else {
-          setCurrentTrackIndex(null);
-          setIsPlaying(false);
-        }
+        setSelectedPlaylist(prev => prev ? { ...prev, tracks } : null);
       }
     } catch (error) {
       console.error(error);
-      // Optionally handle error state for the specific playlist
     }
   };
-
 
   const handleSelectTrack = (trackIndex: number) => {
-    if (selectedPlaylist) {
-      if(selectedPlaylist.tracks[trackIndex].id === currentTrack?.id) {
-        setIsPlaying(!isPlaying);
-      } else {
-        setCurrentTrackIndex(trackIndex);
-        setIsPlaying(true);
-      }
-    }
-  };
-
-  const handlePlayPause = () => {
-    if (currentTrack) {
-      setIsPlaying(!isPlaying);
-    }
-  };
-  
-  const handleNextTrack = () => {
-    if (selectedPlaylist && currentTrackIndex !== null) {
-      const nextTrackIndex = (currentTrackIndex + 1) % selectedPlaylist.tracks.length;
-      setCurrentTrackIndex(nextTrackIndex);
-      setIsPlaying(true);
-    }
-  };
-
-  const handlePrevTrack = () => {
-    if (selectedPlaylist && currentTrackIndex !== null) {
-      const prevTrackIndex = (currentTrackIndex - 1 + selectedPlaylist.tracks.length) % selectedPlaylist.tracks.length;
-      setCurrentTrackIndex(prevTrackIndex);
-      setIsPlaying(true);
+    if (!selectedPlaylist) return;
+    const trackToPlay = selectedPlaylist.tracks[trackIndex];
+    
+    if (trackToPlay.id === sdkCurrentTrack?.id) {
+      togglePlay();
+    } else {
+      const trackUris = selectedPlaylist.tracks.map(t => t.uri);
+      play({ uris: trackUris, offset: { position: trackIndex }});
     }
   };
   
   const handleVolumeChange = (newVolume: number[]) => {
     setVolume(newVolume[0]);
+    sdkSetVolume(newVolume[0]);
   };
 
   const renderSpotifyConnect = () => (
@@ -236,11 +237,11 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 flex-grow">
           <div className="lg:col-span-3 flex items-center justify-center p-4 rounded-lg bg-card/50 backdrop-blur-sm border border-primary/10">
             <VinylPlayer
-              track={currentTrack}
-              isPlaying={isPlaying}
-              onPlayPause={handlePlayPause}
-              onNext={handleNextTrack}
-              onPrev={handlePrevTrack}
+              track={displayTrack}
+              isPlaying={sdkIsPlaying}
+              onPlayPause={togglePlay}
+              onNext={sdkNextTrack}
+              onPrev={sdkPrevTrack}
               volume={volume}
               onVolumeChange={handleVolumeChange}
             />
@@ -253,12 +254,12 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
               onSelectPlaylist={handleSelectPlaylist}
               onSelectTrack={handleSelectTrack}
               onFetchTracks={fetchTracksForPlaylist}
-              isPlaying={isPlaying}
+              isPlaying={sdkIsPlaying}
               isLoading={isLoadingPlaylists}
             />
           </div>
         </div>
-        <MusicPet isPlaying={isPlaying} />
+        <MusicPet isPlaying={sdkIsPlaying} />
         </>
       )}
     </main>
