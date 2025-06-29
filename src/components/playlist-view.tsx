@@ -154,25 +154,14 @@ export function PlaylistView({
       </Card>
     );
   }
-  
-  if (playlists.length === 0 && !isSearching && !searchResultsPlaylist) {
-     return (
-      <Card className="h-full w-full bg-transparent border-2 border-dashed border-primary/20 shadow-lg backdrop-blur-sm rounded-lg flex items-center justify-center">
-        <div className="text-center p-4">
-            <CardTitle className="text-2xl font-headline text-primary">No Playlists Found</CardTitle>
-            <p className="text-muted-foreground mt-2">Could not find any playlists in your Spotify account.</p>
-        </div>
-      </Card>
-    );
-  }
 
   return (
-    <Card className="h-full w-full bg-transparent border-2 border-primary/20 shadow-lg backdrop-blur-sm rounded-lg flex flex-col">
-      <CardHeader>
-        <CardTitle className="text-2xl font-headline text-primary">Your Music</CardTitle>
-      </CardHeader>
-      <CardContent className="flex-grow flex flex-col min-h-0">
-        <div className="px-6 pb-4">
+    <div className="h-full w-full flex flex-col gap-4">
+      <Card className="bg-transparent border-2 border-primary/20 shadow-lg backdrop-blur-sm rounded-lg">
+        <CardHeader>
+          <CardTitle className="text-2xl font-headline text-primary">Search Songs</CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="flex w-full items-center space-x-2">
             <Input
               placeholder="Search for songs..."
@@ -184,59 +173,74 @@ export function PlaylistView({
               <Search className="h-4 w-4" />
             </Button>
           </div>
-        </div>
 
-        {isSearching && (
-          <div className="px-6 pb-4">
-            <h3 className="text-lg font-headline text-muted-foreground mb-2">Searching...</h3>
-            <div className="space-y-2 p-3">
-              <Skeleton className="h-6 w-full" />
-              <Skeleton className="h-6 w-2/3" />
-              <Skeleton className="h-6 w-full" />
+          {(isSearching || searchResultsPlaylist) && (
+            <div className="mt-4">
+              <Separator className="mb-4" />
+                {isSearching && (
+                  <div>
+                    <h3 className="text-lg font-headline text-muted-foreground mb-2">Searching...</h3>
+                    <div className="space-y-2 p-3">
+                      <Skeleton className="h-6 w-full" />
+                      <Skeleton className="h-6 w-2/3" />
+                      <Skeleton className="h-6 w-full" />
+                    </div>
+                  </div>
+                )}
+                {searchResultsPlaylist && (
+                  <div>
+                    <h3 className="text-lg font-headline text-muted-foreground mb-2">Search Results</h3>
+                    <ScrollArea className="h-full max-h-64 pr-4">
+                      {renderTrackList(searchResultsPlaylist)}
+                    </ScrollArea>
+                  </div>
+                )}
             </div>
-          </div>
-        )}
+          )}
+        </CardContent>
+      </Card>
 
-        {searchResultsPlaylist && (
-          <div className="px-6 pb-4">
-            <h3 className="text-lg font-headline text-muted-foreground mb-2">Search Results</h3>
-            <ScrollArea className="h-full max-h-64 pr-4">
-              {renderTrackList(searchResultsPlaylist)}
+      <Card className="bg-transparent border-2 border-primary/20 shadow-lg backdrop-blur-sm rounded-lg flex-grow flex flex-col min-h-0">
+        <CardHeader>
+          <CardTitle className="text-2xl font-headline text-primary">Your Playlists</CardTitle>
+        </CardHeader>
+        <CardContent className="flex-grow flex flex-col min-h-0 p-2 pt-0">
+           {playlists.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-center p-4">
+                <div>
+                    <CardTitle className="text-xl font-headline text-primary">No Playlists Found</CardTitle>
+                    <p className="text-muted-foreground mt-2">Could not find any playlists in your Spotify account.</p>
+                </div>
+            </div>
+          ) : (
+            <ScrollArea className="h-full pr-4 pl-2">
+                <Accordion type="single" collapsible value={selectedPlaylist?.id !== 'search-results' ? selectedPlaylist?.id : undefined}>
+                {playlists.map((playlist) => (
+                    <AccordionItem value={playlist.id} key={playlist.id}>
+                    <AccordionTrigger
+                        className="text-lg font-headline hover:text-primary"
+                        onClick={() => handlePlaylistClick(playlist)}
+                    >
+                        {playlist.name}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                        {loadingTracks.has(playlist.id) ? (
+                        <div className="space-y-2 p-3">
+                            <Skeleton className="h-6 w-full" />
+                            <Skeleton className="h-6 w-2/3" />
+                            <Skeleton className="h-6 w-full" />
+                        </div>
+                        ) : (
+                        renderTrackList(playlist)
+                        )}
+                    </AccordionContent>
+                    </AccordionItem>
+                ))}
+                </Accordion>
             </ScrollArea>
-          </div>
-        )}
-
-        {(isSearching || searchResultsPlaylist) && <Separator className="mb-4 mx-6" />}
-
-        <div className="flex-grow flex flex-col min-h-0">
-          <h3 className="text-lg font-headline text-muted-foreground mb-2 px-6">Your Playlists</h3>
-          <ScrollArea className="h-full pr-4 pl-2">
-            <Accordion type="single" collapsible value={selectedPlaylist?.id !== 'search-results' ? selectedPlaylist?.id : undefined}>
-              {playlists.map((playlist) => (
-                <AccordionItem value={playlist.id} key={playlist.id}>
-                  <AccordionTrigger
-                    className="text-lg font-headline hover:text-primary"
-                    onClick={() => handlePlaylistClick(playlist)}
-                  >
-                    {playlist.name}
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    {loadingTracks.has(playlist.id) ? (
-                      <div className="space-y-2 p-3">
-                        <Skeleton className="h-6 w-full" />
-                        <Skeleton className="h-6 w-2/3" />
-                        <Skeleton className="h-6 w-full" />
-                      </div>
-                    ) : (
-                      renderTrackList(playlist)
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </ScrollArea>
-        </div>
-      </CardContent>
-    </Card>
+           )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
