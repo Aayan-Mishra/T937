@@ -18,7 +18,7 @@ interface PlaylistViewProps {
   playlists: Playlist[];
   selectedPlaylist: Playlist | null;
   currentTrackIndex: number | null;
-  onSelectPlaylist: (playlist: Playlist) => void;
+  onSelectPlaylist: (playlist: Playlist | null) => void;
   onSelectTrack: (playlist: Playlist, trackIndex: number) => void;
   isPlaying: boolean;
   isLoading?: boolean;
@@ -92,19 +92,23 @@ export function PlaylistView({
   };
 
   const handlePlaylistClick = (playlist: Playlist) => {
-    onSelectPlaylist(playlist);
-    setSearchResultsPlaylist(null);
-    setSearchQuery('');
-    
-    if (playlist.tracks.length === 0) {
-      setLoadingTracks(prev => new Set(prev).add(playlist.id));
-      onFetchTracks(playlist.id).finally(() => {
-        setLoadingTracks(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(playlist.id);
-          return newSet;
+    if (selectedPlaylist?.id === playlist.id) {
+      onSelectPlaylist(null);
+    } else {
+      onSelectPlaylist(playlist);
+      setSearchResultsPlaylist(null);
+      setSearchQuery('');
+      
+      if (playlist.tracks.length === 0) {
+        setLoadingTracks(prev => new Set(prev).add(playlist.id));
+        onFetchTracks(playlist.id).finally(() => {
+          setLoadingTracks(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(playlist.id);
+            return newSet;
+          });
         });
-      });
+      }
     }
   };
 

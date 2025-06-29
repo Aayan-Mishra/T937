@@ -207,7 +207,7 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
     router.push('/login');
   };
 
-  const handleSelectPlaylist = (playlist: Playlist) => {
+  const handleSelectPlaylist = (playlist: Playlist | null) => {
     setSelectedPlaylist(playlist);
   };
 
