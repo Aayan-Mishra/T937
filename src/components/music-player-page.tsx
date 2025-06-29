@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Github, LogOut, Music, Youtube } from "lucide-react";
 import { useSpotifyPlayer } from "@/hooks/use-spotify-player";
 import { useToast } from "@/hooks/use-toast";
-import YouTube from 'react-youtube';
 
 const MusicPet = ({ isPlaying }: { isPlaying: boolean }) => {
   return (
@@ -401,21 +400,6 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
         <>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 flex-grow">
           <div className="lg:col-span-3 flex items-center justify-center p-4 rounded-lg bg-card/50 backdrop-blur-sm border border-primary/10">
-            {playbackSource === 'youtube' && youtubeVideoId && (
-                <YouTube
-                    videoId={youtubeVideoId}
-                    opts={{
-                        height: '0',
-                        width: '0',
-                        playerVars: {
-                          autoplay: 1,
-                        },
-                    }}
-                    onReady={onYoutubePlayerReady}
-                    onStateChange={onYoutubePlayerStateChange}
-                    onError={(e) => console.error('YouTube Player Error:', e)}
-                />
-            )}
             <VinylPlayer
               track={currentTrack}
               isPlaying={isPlaying}
@@ -430,6 +414,10 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
               onSeek={handleSeek}
               isLooping={isLooping}
               onLoopToggle={handleLoopToggle}
+              playbackSource={playbackSource}
+              youtubeVideoId={youtubeVideoId}
+              onYoutubePlayerReady={onYoutubePlayerReady}
+              onYoutubePlayerStateChange={onYoutubePlayerStateChange}
             />
           </div>
           <div className="lg:col-span-2 h-full">

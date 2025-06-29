@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Play, Pause, SkipBack, SkipForward, Volume1, Volume2, VolumeX, Repeat } from "lucide-react";
 import Image from 'next/image';
+import YouTube from 'react-youtube';
 
 interface VinylPlayerProps {
   track: Track | null;
@@ -22,6 +23,10 @@ interface VinylPlayerProps {
   onSeek: (time: number[]) => void;
   isLooping: boolean;
   onLoopToggle: () => void;
+  playbackSource: 'spotify' | 'youtube';
+  youtubeVideoId: string | null;
+  onYoutubePlayerReady: (event: any) => void;
+  onYoutubePlayerStateChange: (event: any) => void;
 }
 
 const formatTime = (ms: number) => {
@@ -45,7 +50,11 @@ export function VinylPlayer({
   duration,
   onSeek,
   isLooping,
-  onLoopToggle
+  onLoopToggle,
+  playbackSource,
+  youtubeVideoId,
+  onYoutubePlayerReady,
+  onYoutubePlayerStateChange
 }: VinylPlayerProps) {
   
   const VolumeIcon = () => {
@@ -56,23 +65,39 @@ export function VinylPlayer({
   
   return (
     <div className="flex flex-col items-center justify-center h-full w-full">
-      <div 
-        className="relative w-80 h-80 md:w-96 md:h-96"
-      >
-        <div className={`relative w-full h-full rounded-full shadow-2xl overflow-hidden transition-transform duration-300 ${isPlaying ? 'animate-spin-slow' : ''}`}>
-            <Image
-                src={track?.albumArt || "https://placehold.co/400x400/111111/111111.png"}
-                alt={track?.album || "Vinyl Record"}
-                fill
-                sizes="(max-width: 768px) 320px, 384px"
-                className={`object-cover rounded-full transition-opacity duration-500 ease-in-out`}
-                data-ai-hint="album cover"
-            />
-            <div className="absolute top-1/2 left-1/2 w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background border border-neutral-400 z-10"></div>
-        </div>
+      <div className="relative w-full aspect-square max-w-md rounded-lg shadow-2xl overflow-hidden mb-8">
+        {playbackSource === 'youtube' && youtubeVideoId ? (
+          <>
+             <YouTube
+                videoId={youtubeVideoId}
+                opts={{
+                    playerVars: {
+                      autoplay: 1,
+                      controls: 0,
+                      modestbranding: 1,
+                    },
+                }}
+                onReady={onYoutubePlayerReady}
+                onStateChange={onYoutubePlayerStateChange}
+                className="absolute inset-0 w-full h-full"
+                iframeClassName="absolute inset-0 w-full h-full"
+             />
+             <div className="absolute inset-0 bg-black/20" />
+          </>
+        ) : (
+          <Image
+              key={track?.id || 'placeholder'}
+              src={track?.albumArt || "https://placehold.co/400x400/111111/111111.png"}
+              alt={track?.album || "Album Art"}
+              fill
+              sizes="(max-width: 768px) 80vw, 448px"
+              className={`object-cover animate-fade-in`}
+              data-ai-hint="album cover"
+          />
+        )}
       </div>
 
-      <Card className="w-full max-w-md mt-8 bg-transparent border-none shadow-none">
+      <Card className="w-full max-w-md bg-transparent border-none shadow-none">
         <CardHeader className="text-center min-h-[90px] p-4">
           <CardTitle className="text-3xl font-headline text-primary truncate">{track?.title || "Select a song"}</CardTitle>
           <CardDescription className="text-lg text-muted-foreground truncate">{track?.artist || "to start playing"}</CardDescription>
