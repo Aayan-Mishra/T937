@@ -255,21 +255,21 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
       }
   }, [toast]);
 
-  const handleSelectTrack = useCallback((trackIndex: number) => {
-    if (!selectedPlaylist) return;
-    const trackToPlay = selectedPlaylist.tracks[trackIndex];
+  const handleSelectTrack = useCallback((playlist: Playlist, trackIndex: number) => {
+    setSelectedPlaylist(playlist);
+    const trackToPlay = playlist.tracks[trackIndex];
     
     if (playbackSource === 'spotify') {
         if (trackToPlay.id === sdkCurrentTrack?.id) {
             spotifyTogglePlay();
         } else {
-            const trackUris = selectedPlaylist.tracks.map(t => t.uri);
+            const trackUris = playlist.tracks.map(t => t.uri);
             spotifyPlay({ uris: trackUris, offset: { position: trackIndex }});
         }
     } else {
         handleYoutubeSearch(trackToPlay);
     }
-  }, [selectedPlaylist, playbackSource, sdkCurrentTrack, spotifyTogglePlay, spotifyPlay, handleYoutubeSearch]);
+  }, [playbackSource, sdkCurrentTrack, spotifyTogglePlay, spotifyPlay, handleYoutubeSearch]);
   
   const handleTogglePlay = useCallback(() => {
     if (playbackSource === 'spotify') {
@@ -290,7 +290,9 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
     } else {
         if (!selectedPlaylist || currentTrackIndex === null) return;
         const nextIndex = (currentTrackIndex + 1) % selectedPlaylist.tracks.length;
-        handleYoutubeSearch(selectedPlaylist.tracks[nextIndex]);
+        const nextTrack = selectedPlaylist.tracks[nextIndex];
+        setCurrentTrack(nextTrack);
+        handleYoutubeSearch(nextTrack);
     }
   }, [playbackSource, sdkNextTrack, selectedPlaylist, currentTrackIndex, handleYoutubeSearch]);
 
@@ -300,7 +302,9 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
     } else {
         if (!selectedPlaylist || currentTrackIndex === null) return;
         const prevIndex = (currentTrackIndex - 1 + selectedPlaylist.tracks.length) % selectedPlaylist.tracks.length;
-        handleYoutubeSearch(selectedPlaylist.tracks[prevIndex]);
+        const prevTrack = selectedPlaylist.tracks[prevIndex];
+        setCurrentTrack(prevTrack);
+        handleYoutubeSearch(prevTrack);
     }
   }, [playbackSource, sdkPrevTrack, selectedPlaylist, currentTrackIndex, handleYoutubeSearch]);
 

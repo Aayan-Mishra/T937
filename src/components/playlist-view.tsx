@@ -19,7 +19,7 @@ interface PlaylistViewProps {
   selectedPlaylist: Playlist | null;
   currentTrackIndex: number | null;
   onSelectPlaylist: (playlist: Playlist) => void;
-  onSelectTrack: (trackIndex: number) => void;
+  onSelectTrack: (playlist: Playlist, trackIndex: number) => void;
   isPlaying: boolean;
   isLoading?: boolean;
   onFetchTracks: (playlistId: string) => Promise<void>;
@@ -118,7 +118,7 @@ export function PlaylistView({
         playlist.tracks.map((track, index) => (
           <li key={`${track.id}-${index}`}>
             <button
-              onClick={() => onSelectTrack(index)}
+              onClick={() => onSelectTrack(playlist, index)}
               className={cn(
                 "w-full text-left p-3 rounded-md transition-colors duration-200 flex items-center gap-4",
                 selectedPlaylist?.id === playlist.id && currentTrackIndex === index
