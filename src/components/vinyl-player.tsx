@@ -64,7 +64,7 @@ export function VinylPlayer({
   };
   
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full">
+    <div className="flex flex-col items-center justify-center w-full">
       <div className="relative w-full aspect-square max-w-md rounded-lg shadow-2xl overflow-hidden mb-8">
         {playbackSource === 'youtube' && youtubeVideoId ? (
           <>

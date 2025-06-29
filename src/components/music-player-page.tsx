@@ -428,7 +428,7 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
       {!isSpotifyConnected ? renderSpotifyConnect() : (
         <>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 flex-grow">
-          <div className="lg:col-span-3 flex items-center justify-center p-4 rounded-lg bg-card/50 backdrop-blur-sm border border-primary/10">
+          <div className="lg:col-span-3 flex items-start justify-center p-4 rounded-lg bg-card/50 backdrop-blur-sm border border-primary/10">
             <VinylPlayer
               track={currentTrack}
               isPlaying={isPlaying}
