@@ -11,6 +11,42 @@ import { VinylPlayer } from "@/components/vinyl-player";
 import { Button } from "@/components/ui/button";
 import { Github, LogOut, Music } from "lucide-react";
 
+const MusicPet = ({ isPlaying }: { isPlaying: boolean }) => {
+  return (
+    <div className="absolute bottom-5 left-5 z-20 group" title="T-937's little helper!">
+      <style jsx>{`
+            .head {
+                animation: ${isPlaying ? 'head-bob 0.8s ease-in-out infinite' : 'none'};
+                transform-origin: bottom center;
+            }
+            .body {
+                 animation: ${isPlaying ? 'body-bob 0.8s ease-in-out infinite' : 'none'};
+            }
+        `}</style>
+      <svg
+        width="80"
+        height="80"
+        viewBox="0 0 100 100"
+        xmlns="http://www.w3.org/2000/svg"
+        className="drop-shadow-lg"
+      >
+        <g className="body">
+          <path d="M30 95C30 86.7157 36.7157 80 45 80H55C63.2843 80 70 86.7157 70 95V95H30V95Z" fill="hsl(var(--secondary))" stroke="hsl(var(--foreground))" strokeWidth="3"/>
+          <rect x="38" y="85" width="24" height="5" rx="2.5" fill="hsl(var(--accent))" />
+        </g>
+        <g className="head">
+            <circle cx="50" cy="55" r="25" fill="hsl(var(--secondary))" stroke="hsl(var(--foreground))" strokeWidth="3" />
+            <circle cx="42" cy="55" r="3" fill="hsl(var(--foreground))" />
+            <circle cx="58" cy="55" r="3" fill="hsl(var(--foreground))" />
+            <path d="M 45 65 Q 50 72 55 65" stroke="hsl(var(--foreground))" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+            <path d="M49,30 L40,20" stroke="hsl(var(--foreground))" strokeWidth="3" strokeLinecap="round" />
+            <path d="M51,30 L60,20" stroke="hsl(var(--foreground))" strokeWidth="3" strokeLinecap="round" />
+        </g>
+      </svg>
+    </div>
+  );
+};
+
 export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConnected }: { user: User, isSpotifyConnected: boolean }) {
   const router = useRouter();
   const [isSpotifyConnected, setIsSpotifyConnected] = useState(initialIsSpotifyConnected);
@@ -196,8 +232,9 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
       </header>
 
       {!isSpotifyConnected ? renderSpotifyConnect() : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-grow">
-          <div className="flex items-center justify-center">
+        <>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 flex-grow">
+          <div className="lg:col-span-3 flex items-center justify-center p-4 rounded-lg bg-card/50 backdrop-blur-sm border border-primary/10">
             <VinylPlayer
               track={currentTrack}
               isPlaying={isPlaying}
@@ -208,7 +245,7 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
               onVolumeChange={handleVolumeChange}
             />
           </div>
-          <div className="h-full">
+          <div className="lg:col-span-2 h-full">
             <PlaylistView
               playlists={playlists}
               selectedPlaylist={selectedPlaylist}
@@ -221,6 +258,8 @@ export function MusicPlayerPage({ user, isSpotifyConnected: initialIsSpotifyConn
             />
           </div>
         </div>
+        <MusicPet isPlaying={isPlaying} />
+        </>
       )}
     </main>
   );

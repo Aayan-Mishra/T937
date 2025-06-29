@@ -12,6 +12,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Github } from 'lucide-react';
 
+const StaticPet = () => (
+    <div className="absolute bottom-5 left-5 z-20" title="T-937's little helper!">
+        <svg width="80" height="80" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-lg opacity-80">
+            <g>
+                <path d="M30 95C30 86.7157 36.7157 80 45 80H55C63.2843 80 70 86.7157 70 95V95H30V95Z" fill="hsl(var(--secondary))" stroke="hsl(var(--foreground))" strokeWidth="3"/>
+                <rect x="38" y="85" width="24" height="5" rx="2.5" fill="hsl(var(--accent))" />
+            </g>
+            <g style={{transformOrigin: 'bottom center'}}>
+                <circle cx="50" cy="55" r="25" fill="hsl(var(--secondary))" stroke="hsl(var(--foreground))" strokeWidth="3" />
+                <circle cx="42" cy="55" r="3" fill="hsl(var(--foreground))" />
+                <circle cx="58" cy="55" r="3" fill="hsl(var(--foreground))" />
+                <path d="M 45 65 Q 50 72 55 65" stroke="hsl(var(--foreground))" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+                <path d="M49,30 L40,20" stroke="hsl(var(--foreground))" strokeWidth="3" strokeLinecap="round" />
+                <path d="M51,30 L60,20" stroke="hsl(var(--foreground))" strokeWidth="3" strokeLinecap="round" />
+            </g>
+        </svg>
+    </div>
+);
+
 export default function SignUpPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -37,7 +56,7 @@ export default function SignUpPage() {
   };
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen p-4 bg-background text-foreground">
+    <main className="relative flex flex-col items-center justify-center min-h-screen p-4 bg-background text-foreground">
         <div className="absolute top-4 right-4">
             <Button variant="ghost" size="icon" asChild>
                 <a href="https://github.com/firebase/firebase-genkit" target="_blank" rel="noopener noreferrer" aria-label="Github repository">
@@ -85,6 +104,7 @@ export default function SignUpPage() {
           </div>
         </CardContent>
       </Card>
+      <StaticPet />
       <footer className="absolute bottom-4 text-center text-muted-foreground">
         <p>Built for the modern nostalgist.</p>
       </footer>

@@ -35,14 +35,17 @@ export function VinylPlayer({
   
   return (
     <div className="flex flex-col items-center justify-center h-full w-full">
-      <div className="relative w-80 h-80 md:w-96 md:h-96">
+      <div 
+        className="relative w-80 h-80 md:w-96 md:h-96 transition-all duration-500 rounded-full"
+        style={{ animation: isPlaying ? 'shadow-pulse 2s infinite' : 'none' }}
+        >
         <Image
           src="https://placehold.co/400x400.png"
           alt="Vinyl record base"
           width={400}
           height={400}
-          className="absolute inset-0 z-0"
-          data-ai-hint="vinyl record"
+          className="absolute inset-0 z-0 opacity-10"
+          data-ai-hint="wood grain"
         />
         <div className={`absolute inset-0 w-full h-full p-10 transition-transform duration-300 ${isPlaying ? 'animate-spin-slow' : ''}`}>
           <Image
@@ -50,7 +53,7 @@ export function VinylPlayer({
             alt={track?.album || "Album art"}
             width={300}
             height={300}
-            className="rounded-full shadow-2xl"
+            className="rounded-full shadow-2xl object-cover"
             data-ai-hint="album cover"
           />
         </div>
