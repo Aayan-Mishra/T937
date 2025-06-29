@@ -39,18 +39,13 @@ export default function Home() {
   }, [user, loading, router]);
   
   useEffect(() => {
-    const checkCookie = () => {
-        const connected = getSpotifyCookie();
-        setIsSpotifyConnected(connected);
-        if (connected) {
-            setAccessToken(getSpotifyAccessToken());
-        } else {
-            setAccessToken(null);
-        }
-    };
-    checkCookie();
-    document.addEventListener('visibilitychange', checkCookie);
-    return () => document.removeEventListener('visibilitychange', checkCookie);
+    const connected = getSpotifyCookie();
+    setIsSpotifyConnected(connected);
+    if (connected) {
+        setAccessToken(getSpotifyAccessToken());
+    } else {
+        setAccessToken(null);
+    }
   }, []);
 
   if (loading || !user) {

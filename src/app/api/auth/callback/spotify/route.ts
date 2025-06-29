@@ -49,7 +49,6 @@ export async function GET(request: NextRequest) {
   const responseRedirect = NextResponse.redirect(new URL('/', request.url));
 
   responseRedirect.cookies.set('spotify_access_token', access_token, {
-    httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     maxAge: expires_in, // expires_in is in seconds
     path: '/',
