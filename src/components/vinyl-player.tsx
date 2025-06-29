@@ -1,13 +1,21 @@
 
 "use client";
 
+import { useState } from "react";
 import type { Track } from "@/lib/types";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, SkipBack, SkipForward, Volume1, Volume2, VolumeX, Repeat } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume1, Volume2, VolumeX, Repeat, Download } from "lucide-react";
 import Image from 'next/image';
 import YouTube from 'react-youtube';
+import { useToast } from "@/hooks/use-toast";
+import { 
+    DropdownMenu, 
+    DropdownMenuContent, 
+    DropdownMenuItem, 
+    DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 
 interface VinylPlayerProps {
   track: Track | null;
@@ -56,6 +64,63 @@ export function VinylPlayer({
   onYoutubePlayerReady,
   onYoutubePlayerStateChange
 }: VinylPlayerProps) {
+  const { toast } = useToast();
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async (format: 'mp3' | 'mp4') => {
+    if (!youtubeVideoId) {
+        toast({
+            variant: 'destructive',
+            title: 'Download Unavailable',
+            description: 'A YouTube video is required for download. Please use the YouTube playback fallback first.',
+        });
+        return;
+    }
+
+    setIsDownloading(true);
+    try {
+        const cobaltApiUrl = 'https://cobalt.tools/api/json';
+        const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeVideoId}`;
+
+        const response = await fetch(cobaltApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                url: youtubeUrl,
+                aFormat: 'mp3',
+                vQuality: '720',
+                isAudioOnly: format === 'mp3',
+                isNoTTWatermark: true,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to get download link. Cobalt API says: ${errorText}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.status === 'stream') {
+            window.open(data.url, '_blank');
+        } else if (data.text) {
+             throw new Error(data.text);
+        } else {
+             throw new Error(`Unexpected status from Cobalt API: ${data.status}`);
+        }
+    } catch (error: any) {
+        toast({
+            variant: 'destructive',
+            title: 'Download Failed',
+            description: error.message,
+        });
+    } finally {
+        setIsDownloading(false);
+    }
+  };
   
   const VolumeIcon = () => {
     if (volume === 0) return <VolumeX className="text-accent" />;
@@ -64,7 +129,7 @@ export function VinylPlayer({
   };
   
   return (
-    <div className="flex flex-col items-center justify-center w-full">
+    <div className="flex flex-col items-center justify-start w-full h-full pt-8">
       <div className="relative w-full aspect-square max-w-md rounded-lg shadow-2xl overflow-hidden mb-8">
         {playbackSource === 'youtube' && youtubeVideoId ? (
           <>
@@ -134,6 +199,21 @@ export function VinylPlayer({
                   <Button variant="ghost" size="icon" onClick={onLoopToggle} disabled={!track} aria-label="Toggle loop">
                     <Repeat className={`w-6 h-6 ${isLooping ? 'text-primary' : 'text-accent'}`} />
                   </Button>
+                   <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" disabled={!track || isDownloading || !youtubeVideoId} aria-label="Download track">
+                                <Download className="w-6 h-6 text-accent" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => handleDownload('mp3')} disabled={isDownloading}>
+                                {isDownloading ? 'Preparing...' : 'Download MP3'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownload('mp4')} disabled={isDownloading}>
+                                {isDownloading ? 'Preparing...' : 'Download MP4'}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </>
               )}
             </div>
