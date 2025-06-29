@@ -39,26 +39,23 @@ export function VinylPlayer({
   return (
     <div className="flex flex-col items-center justify-center h-full w-full">
       <div 
-        className="relative w-80 h-80 md:w-96 md:h-96 transition-all duration-500 rounded-full"
+        className="relative w-80 h-80 md:w-96 md:h-96 transition-all duration-500"
         style={{ animation: isPlaying ? 'shadow-pulse 2s infinite' : 'none' }}
-        >
-        <Image
-          src="https://placehold.co/400x400.png"
-          alt="Vinyl record base"
-          width={400}
-          height={400}
-          className="absolute inset-0 z-0 opacity-10"
-          data-ai-hint="wood grain"
-        />
-        <div className={`absolute inset-0 w-full h-full p-10 transition-transform duration-300 ${isPlaying ? 'animate-spin-slow' : ''}`}>
-          <Image
-            src={track?.albumArt || "https://placehold.co/300x300.png"}
-            alt={track?.album || "Album art"}
-            width={300}
-            height={300}
-            className="rounded-full shadow-2xl object-cover"
-            data-ai-hint="album cover"
-          />
+      >
+        <div className={`relative w-full h-full rounded-full shadow-2xl overflow-hidden transition-transform duration-300 ${isPlaying ? 'animate-spin-slow' : ''}`}>
+            {/* Black vinyl background */}
+            <div className="absolute inset-0 w-full h-full bg-neutral-900"></div>
+            {/* Album art image */}
+            <Image
+                src={track?.albumArt || "https://placehold.co/400x400.png"}
+                alt={track?.album || "Vinyl Record"}
+                fill
+                sizes="(max-width: 768px) 320px, 384px"
+                className={`object-cover transition-opacity duration-500 ease-in-out ${track ? 'opacity-100' : 'opacity-0'}`}
+                data-ai-hint="album cover"
+            />
+             {/* Spindle hole */}
+            <div className="absolute top-1/2 left-1/2 w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background border border-neutral-400 z-10"></div>
         </div>
       </div>
 
