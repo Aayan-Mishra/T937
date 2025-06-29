@@ -79,38 +79,26 @@ export function VinylPlayer({
 
     setIsDownloading(true);
     try {
-        const cobaltApiUrl = 'https://cobalt.tools/api/json';
-        const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeVideoId}`;
-
-        const response = await fetch(cobaltApiUrl, {
+        const response = await fetch('/api/download', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
             },
-            body: JSON.stringify({
-                url: youtubeUrl,
-                aFormat: 'mp3',
-                vQuality: '720',
-                isAudioOnly: format === 'mp3',
-                isNoTTWatermark: true,
-            }),
+            body: JSON.stringify({ youtubeVideoId, format }),
         });
 
+        const data = await response.json();
+
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to get download link. Cobalt API says: ${errorText}`);
+            throw new Error(data.error || 'Failed to get download link.');
+        }
+        
+        if (data.downloadUrl) {
+            window.open(data.downloadUrl, '_blank');
+        } else {
+            throw new Error('No download URL received from server.');
         }
 
-        const data = await response.json();
-        
-        if (data.status === 'stream') {
-            window.open(data.url, '_blank');
-        } else if (data.text) {
-             throw new Error(data.text);
-        } else {
-             throw new Error(`Unexpected status from Cobalt API: ${data.status}`);
-        }
     } catch (error: any) {
         toast({
             variant: 'destructive',
@@ -201,7 +189,7 @@ export function VinylPlayer({
                   </Button>
                    <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" disabled={!track || isDownloading || !youtubeVideoId} aria-label="Download track">
+                            <Button variant="ghost" size="icon" disabled={!track || isDownloading || playbackSource !== 'youtube'} aria-label="Download track">
                                 <Download className="w-6 h-6 text-accent" />
                             </Button>
                         </DropdownMenuTrigger>
